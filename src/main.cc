@@ -12,6 +12,15 @@
 #define CHAR(c) ((c == 0) ? '$' : c)
 #endif
 
+#define PERF_STATS
+
+#ifdef PERF_STATS
+uint64_t num_comparisons = 0;
+#define INCREMENT_COMPARISONS num_comparisons++;
+#else
+#define INCREMENT_COMPARISONS
+#endif
+
 typedef unsigned long long int TimeStamp;
 static TimeStamp GetTimestamp() {
   struct timeval now;
@@ -21,7 +30,8 @@ static TimeStamp GetTimestamp() {
 }
 
 template<typename alphabet_type, typename size_type>
-void Densify(alphabet_type* buffer, size_type size, std::map<alphabet_type, alphabet_type> alphabet) {
+void Densify(alphabet_type* buffer, size_type size,
+             std::map<alphabet_type, alphabet_type> alphabet) {
   for (uint64_t i = 0; i < size; i++) {
     buffer[i] = alphabet[buffer[i]];
   }
@@ -37,11 +47,8 @@ void ConstructSAInMemory(std::string& filename, int64_t* SA, uint64_t size,
 }
 
 int CompareSuffix(char* data, uint64_t size, uint64_t i, uint64_t j) {
-  if (i == j) {
-    fprintf(stderr, "You are stupid\n");
-    exit(0);
-  }
   while (true) {
+    INCREMENT_COMPARISONS
     if (data[i] != data[j])
       return data[i] - data[j];
     i = (i + 1) % size;
@@ -118,20 +125,30 @@ int main(int argc, char** argv) {
     alphabet[it->first] = alphabet_size++;
   }
 
-  Densify(left, left_size, alphabet);
-  Densify(right, right_size, alphabet);
-
-  SuccinctUtils::WriteToFile(left, left_size, left_file);
-  delete[] left;
-  SuccinctUtils::WriteToFile(right, right_size, right_file);
-  delete[] right;
-
   t1 = GetTimestamp();
   tdiff = t1 - t0;
   fprintf(stderr, "Time to create left & right=%llu\n", tdiff / (1000 * 1000));
 
-  fprintf(stderr, "input_size_ = %llu, left_size = %llu, right_size = %llu\n",
-          input_size_, left_size, right_size);
+  t0 = GetTimestamp();
+  Densify(left, left_size, alphabet);
+  t1 = GetTimestamp();
+  tdiff = t1 - t0;
+  fprintf(stderr, "Time to densify left=%llu\n", tdiff / (1000 * 1000));
+
+  t0 = GetTimestamp();
+  Densify(right, right_size, alphabet);
+  t1 = GetTimestamp();
+  tdiff = t1 - t0;
+  fprintf(stderr, "Time to densify right=%llu\n", tdiff / (1000 * 1000));
+
+  t0 = GetTimestamp();
+  SuccinctUtils::WriteToFile(left, left_size, left_file);
+  delete[] left;
+  SuccinctUtils::WriteToFile(right, right_size, right_file);
+  delete[] right;
+  t1 = GetTimestamp();
+  tdiff = t1 - t0;
+  fprintf(stderr, "Time to write left & right to disk=%llu\n", tdiff / (1000 * 1000));
 
   t0 = GetTimestamp();
   int64_t* lSA = new int64_t[left_size]();
@@ -182,12 +199,9 @@ int main(int argc, char** argv) {
   left_sa_stream.Remove();
   right_sa_stream.Remove();
 
-
   t1 = GetTimestamp();
   tdiff = t1 - t0;
   fprintf(stderr, "Time to merge sort SA=%llu\n", tdiff / (1000 * 1000));
-
-
 
 #ifdef TEST
   int64_t *SA1, *SA2;
@@ -201,6 +215,9 @@ int main(int argc, char** argv) {
   }
 #endif
 
+#ifdef PERF_STATS
+  fprintf(stderr, "#Comparisons = %llu\n", num_comparisons);
+#endif
   delete[] data;
   return 0;
 }
