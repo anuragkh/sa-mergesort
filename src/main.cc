@@ -181,11 +181,26 @@ int main(int argc, char** argv) {
   right_sa_stream.Close();
   left_sa_stream.Remove();
   right_sa_stream.Remove();
-  delete[] data;
+
 
   t1 = GetTimestamp();
   tdiff = t1 - t0;
   fprintf(stderr, "Time to merge sort SA=%llu\n", tdiff / (1000 * 1000));
 
+
+
+#ifdef TEST
+  int64_t *SA1, *SA2;
+  SA1 = new int64_t[input_size_];
+  SA2 = new int64_t[input_size_];
+
+  SuccinctUtils::ReadFromFile(SA1, input_size_, sa_file);
+  divsufsortxx::constructSA(data, data + input_size_, SA2, SA2 + input_size_, 256);
+  for(uint64_t i = 0; i < input_size_; i++) {
+    assert(SA1[i] == SA2[i]);
+  }
+#endif
+
+  delete[] data;
   return 0;
 }
