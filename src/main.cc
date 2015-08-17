@@ -2,7 +2,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <map>
-#include <iterator>
 
 #include "divsufsortxx.h"
 #include "divsufsortxx_utility.h"
