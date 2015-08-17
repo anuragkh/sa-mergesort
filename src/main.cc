@@ -31,7 +31,7 @@ static TimeStamp GetTimestamp() {
 
 template<typename alphabet_type, typename size_type>
 void Densify(alphabet_type* buffer, size_type size,
-             std::map<alphabet_type, alphabet_type> alphabet) {
+             std::map<alphabet_type, alphabet_type>& alphabet) {
   for (uint64_t i = 0; i < size; i++) {
     buffer[i] = alphabet[buffer[i]];
   }
