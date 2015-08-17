@@ -28,6 +28,7 @@
 #ifndef _DIVSUFSORTXX_H_
 #define _DIVSUFSORTXX_H_
 
+#include <stddef.h>
 #include <algorithm>
 #include <stack>
 
