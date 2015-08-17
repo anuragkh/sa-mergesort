@@ -1,12 +1,12 @@
-#include <sys/time.h>
-#include <cstdio>
-#include <cstdlib>
-#include <map>
-
 #include "divsufsortxx.h"
 #include "data_input_stream.h"
 #include "data_output_stream.h"
 #include "succinct_utils.h"
+
+#include <sys/time.h>
+#include <cstdio>
+#include <cstdlib>
+#include <map>
 
 #ifndef CHAR
 #define CHAR(c) ((c == 0) ? '$' : c)
