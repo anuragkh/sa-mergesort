@@ -3,7 +3,7 @@
 #include "data_output_stream.h"
 #include "succinct_utils.h"
 
-#include <cstddef>
+#include <stddef.h>
 #include <sys/time.h>
 #include <cstdio>
 #include <cstdlib>
