@@ -4,7 +4,6 @@
 #include <map>
 
 #include "divsufsortxx.h"
-#include "divsufsortxx_utility.h"
 #include "data_input_stream.h"
 #include "data_output_stream.h"
 #include "succinct_utils.h"
