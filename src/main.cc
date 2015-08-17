@@ -40,10 +40,10 @@ size_type ReduceAlphabet(alphabet_type* buffer, size_type size) {
   return alphabet_size;
 }
 
-void ConstructSAInMemory(std::string& filename, int64_t* SA, uint64_t size) {
+void ConstructSAInMemory(std::string& filename, int64_t* SA, uint64_t size,
+                         int32_t alphabet_size) {
   uint16_t* data = new uint16_t[size];
   SuccinctUtils::ReadFromFile(data, size, filename);
-  int32_t alphabet_size = ReduceAlphabet(data, size);
 
   divsufsortxx::constructSA(data, data + size, SA, SA + size, alphabet_size);
   delete[] data;
@@ -88,64 +88,74 @@ int main(int argc, char** argv) {
   uint64_t input_size_ = fsize + 1;
 
   // Construct left and right
-  DataOutputStream<uint16_t> left_stream(left_file);
-  DataOutputStream<uint16_t> right_stream(right_file);
-  int64_t left_size, right_size;
+  uint16_t *left, *right;
+  int64_t left_size, right_size, left_idx, right_idx;
   DataInputStream<char> data_stream(filename_str);
   char cur_c, nxt_c, fst_c;
   uint16_t val;
   uint64_t data_pos;
 
   t0 = GetTimestamp();
-  left_size = (input_size_ % 2 == 0) ? (input_size_ / 2) : (input_size_ / 2 + 1);
+  left_size =
+      (input_size_ % 2 == 0) ? (input_size_ / 2) : (input_size_ / 2 + 1);
   right_size = input_size_ - left_size;
+  left = new uint16_t[left_size];
+  right = new uint16_t[right_size];
   fst_c = cur_c = data_stream.Get();
+  left_idx = right_idx = 0;
   for (data_pos = 0; data_stream.GetCurrentIndex() < input_size_; data_pos++) {
     nxt_c = data_stream.Get();
     val = cur_c * 256 + nxt_c;
     if (data_pos % 2 == 0) {
-      left_stream.Put(val);
+      left[left_idx++] = val;
     } else {
-      right_stream.Put(val);
+      right[right_idx++] = val;
     }
     cur_c = nxt_c;
   }
   nxt_c = fst_c;
   val = cur_c * 256 + nxt_c;
   if (data_pos % 2 == 0) {
-    left_stream.Put(val);
+    left[left_idx++] = val;
   } else {
-    right_stream.Put(val);
+    right[right_idx++] = val;
   }
   data_stream.Close();
-  left_stream.Close();
-  right_stream.Close();
+
+  int32_t left_alphabet_size = ReduceAlphabet(left, left_size);
+  int32_t right_alphabet_size = ReduceAlphabet(right, right_size);
+
+  SuccinctUtils::WriteToFile(left, left_size, left_file);
+  delete[] left;
+  SuccinctUtils::WriteToFile(right, right_size, right_file);
+  delete[] right;
 
   t1 = GetTimestamp();
   tdiff = t1 - t0;
-  fprintf(stderr, "Time to create left & right=%llu\n", tdiff/(1000*1000));
+  fprintf(stderr, "Time to create left & right=%llu\n", tdiff / (1000 * 1000));
 
-  fprintf(stderr, "input_size_ = %llu, left_size = %llu, right_size = %llu\n", input_size_, left_size, right_size);
+  fprintf(stderr, "input_size_ = %llu, left_size = %llu, right_size = %llu\n",
+          input_size_, left_size, right_size);
 
   t0 = GetTimestamp();
   int64_t* lSA = new int64_t[left_size]();
-  ConstructSAInMemory(left_file, lSA, left_size);
+  ConstructSAInMemory(left_file, lSA, left_size, left_alphabet_size);
   remove(left_file.c_str());
   SuccinctUtils::WriteToFile(lSA, left_size, left_sa_file);
   delete[] lSA;
   t1 = GetTimestamp();
   tdiff = t1 - t0;
-  fprintf(stderr, "Time to create left SA=%llu\n", tdiff/(1000*1000));
+  fprintf(stderr, "Time to create left SA=%llu\n", tdiff / (1000 * 1000));
 
   t0 = GetTimestamp();
   int64_t* rSA = new int64_t[right_size]();
-  ConstructSAInMemory(right_file, rSA, right_size);
+  ConstructSAInMemory(right_file, rSA, right_size, right_alphabet_size);
   remove(right_file.c_str());
   SuccinctUtils::WriteToFile(rSA, right_size, right_sa_file);
   delete[] rSA;
   t1 = GetTimestamp();
   tdiff = t1 - t0;
-  fprintf(stderr, "Time to create right SA=%llu\n", tdiff/(1000*1000));
+  fprintf(stderr, "Time to create right SA=%llu\n", tdiff / (1000 * 1000));
 
   // Merge sort the results
   t0 = GetTimestamp();
@@ -170,7 +180,6 @@ int main(int argc, char** argv) {
       second = 2 * right_sa_stream.Get() + 1;
     }
   }
-  delete[] data;
   sa_stream.Close();
   left_sa_stream.Close();
   right_sa_stream.Close();
@@ -179,7 +188,20 @@ int main(int argc, char** argv) {
 
   t1 = GetTimestamp();
   tdiff = t1 - t0;
-  fprintf(stderr, "Time to merge sort SA=%llu\n", tdiff/(1000*1000));
+  fprintf(stderr, "Time to merge sort SA=%llu\n", tdiff / (1000 * 1000));
+
+  // Testing
+  int64_t *SA1 = new int64_t[input_size_];
+  SuccinctUtils::ReadFromFile(SA1, input_size_, sa_file);
+
+  int64_t *SA2 = new int64_t[input_size_];
+  divsufsortxx::constructSA(data, data + input_size_, SA2, SA2 + input_size_, 256);
+
+  for(uint64_t i = 0; i < input_size_; i++) {
+    assert(SA1[i] == SA2[i]);
+  }
+
+  delete[] data;
 
   return 0;
 }
