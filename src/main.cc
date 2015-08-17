@@ -21,23 +21,10 @@ static TimeStamp GetTimestamp() {
 }
 
 template<typename alphabet_type, typename size_type>
-size_type ReduceAlphabet(alphabet_type* buffer, size_type size) {
-  size_type alphabet_size = 0;
-  std::map<alphabet_type, alphabet_type> alphabet;
-  for (uint64_t i = 0; i < size; i++) {
-    alphabet[buffer[i]] = 0;
-  }
-
-  typedef typename std::map<alphabet_type, alphabet_type>::iterator AlphabetIterator;
-  for (AlphabetIterator it = alphabet.begin(); it != alphabet.end(); it++) {
-    alphabet[it->first] = alphabet_size++;
-  }
-
+void Densify(alphabet_type* buffer, size_type size, std::map<alphabet_type, alphabet_type> alphabet) {
   for (uint64_t i = 0; i < size; i++) {
     buffer[i] = alphabet[buffer[i]];
   }
-
-  return alphabet_size;
 }
 
 void ConstructSAInMemory(std::string& filename, int64_t* SA, uint64_t size,
@@ -90,6 +77,7 @@ int main(int argc, char** argv) {
   // Construct left and right
   uint16_t *left, *right;
   int64_t left_size, right_size, left_idx, right_idx;
+  std::map<uint16_t, uint16_t> alphabet;
   DataInputStream<char> data_stream(filename_str);
   char cur_c, nxt_c, fst_c;
   uint16_t val;
@@ -106,6 +94,7 @@ int main(int argc, char** argv) {
   for (data_pos = 0; data_stream.GetCurrentIndex() < input_size_; data_pos++) {
     nxt_c = data_stream.Get();
     val = cur_c * 256 + nxt_c;
+    alphabet[val] = 0;
     if (data_pos % 2 == 0) {
       left[left_idx++] = val;
     } else {
@@ -115,6 +104,7 @@ int main(int argc, char** argv) {
   }
   nxt_c = fst_c;
   val = cur_c * 256 + nxt_c;
+  alphabet[val] = 0;
   if (data_pos % 2 == 0) {
     left[left_idx++] = val;
   } else {
@@ -122,8 +112,14 @@ int main(int argc, char** argv) {
   }
   data_stream.Close();
 
-  int32_t left_alphabet_size = ReduceAlphabet(left, left_size);
-  int32_t right_alphabet_size = ReduceAlphabet(right, right_size);
+  int32_t alphabet_size;
+  typedef typename std::map<uint16_t, uint16_t>::iterator AlphabetIterator;
+  for (AlphabetIterator it = alphabet.begin(); it != alphabet.end(); it++) {
+    alphabet[it->first] = alphabet_size++;
+  }
+
+  Densify(left, left_size, alphabet);
+  Densify(right, right_size, alphabet);
 
   SuccinctUtils::WriteToFile(left, left_size, left_file);
   delete[] left;
@@ -139,7 +135,7 @@ int main(int argc, char** argv) {
 
   t0 = GetTimestamp();
   int64_t* lSA = new int64_t[left_size]();
-  ConstructSAInMemory(left_file, lSA, left_size, left_alphabet_size);
+  ConstructSAInMemory(left_file, lSA, left_size, alphabet_size);
   remove(left_file.c_str());
   SuccinctUtils::WriteToFile(lSA, left_size, left_sa_file);
   delete[] lSA;
@@ -149,7 +145,7 @@ int main(int argc, char** argv) {
 
   t0 = GetTimestamp();
   int64_t* rSA = new int64_t[right_size]();
-  ConstructSAInMemory(right_file, rSA, right_size, right_alphabet_size);
+  ConstructSAInMemory(right_file, rSA, right_size, alphabet_size);
   remove(right_file.c_str());
   SuccinctUtils::WriteToFile(rSA, right_size, right_sa_file);
   delete[] rSA;
@@ -190,7 +186,6 @@ int main(int argc, char** argv) {
   t1 = GetTimestamp();
   tdiff = t1 - t0;
   fprintf(stderr, "Time to merge sort SA=%llu\n", tdiff / (1000 * 1000));
-
 
   return 0;
 }
